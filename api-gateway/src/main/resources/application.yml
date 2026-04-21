@@ -1,0 +1,73 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL:lb://auth-service}
+          predicates:
+            - Path=/api/auth/**
+
+        - id: restaurant-service
+          uri: ${RESTAURANT_SERVICE_URL:lb://restaurant-service}
+          predicates:
+            - Path=/api/restaurants/**
+
+        - id: menu-service
+          uri: ${RESTAURANT_SERVICE_URL:lb://restaurant-service}
+          predicates:
+            - Path=/api/menu/**
+
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:lb://order-service}
+          predicates:
+            - Path=/api/orders/**
+
+        - id: payment-service
+          uri: ${PAYMENT_SERVICE_URL:lb://payment-service}
+          predicates:
+            - Path=/api/payments/**
+
+        - id: wallet-service
+          uri: ${PAYMENT_SERVICE_URL:lb://payment-service}
+          predicates:
+            - Path=/api/payments/wallet/**
+
+        - id: delivery-service
+          uri: ${DELIVERY_SERVICE_URL:lb://delivery-service}
+          predicates:
+            - Path=/api/deliveries/**
+
+        - id: delivery-agent-service
+          uri: ${DELIVERY_SERVICE_URL:lb://delivery-service}
+          predicates:
+            - Path=/api/delivery-agents/**
+
+        - id: review-service
+          uri: ${REVIEW_SERVICE_URL:lb://review-service}
+          predicates:
+            - Path=/api/reviews/**
+
+        - id: cart-service
+          uri: ${CART_SERVICE_URL:lb://cart-service}
+          predicates:
+            - Path=/api/cart/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka/}
+    register-with-eureka: false
+    fetch-registry: false
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
