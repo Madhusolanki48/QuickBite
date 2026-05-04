@@ -1,0 +1,13 @@
+target/
+.m2repo/
+.m2-local/
+.idea/
+.vscode/
+*.iml
+*.log
+node_modules/
+dist/
+.angular/
+**/.classpath
+**/.project
+**/.settings/
