@@ -6,6 +6,28 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - http://localhost:4200
+              - http://localhost:5173
+              - http://localhost:3000
+              - http://127.0.0.1:4200
+              - http://127.0.0.1:5173
+              - http://127.0.0.1:3000
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - "*"
+            exposedHeaders:
+              - Authorization
+              - Location
       routes:
         - id: auth-service
           uri: ${AUTH_SERVICE_URL:lb://auth-service}
@@ -21,11 +43,6 @@ spring:
           uri: ${RESTAURANT_SERVICE_URL:lb://restaurant-service}
           predicates:
             - Path=/api/menu/**
-
-        - id: order-service
-          uri: ${ORDER_SERVICE_URL:lb://order-service}
-          predicates:
-            - Path=/api/orders/**
 
         - id: payment-service
           uri: ${PAYMENT_SERVICE_URL:lb://payment-service}
@@ -62,9 +79,15 @@ eureka:
     service-url:
       defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka/}
     register-with-eureka: false
-    fetch-registry: false
+    fetch-registry: true
   instance:
     prefer-ip-address: true
+
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:rzp_test_SlYxvOhJfVRqVE}
+  key-secret: ${RAZORPAY_KEY_SECRET:upmDs62CHCiw1REUdWbRe77a}
+  currency: ${RAZORPAY_CURRENCY:INR}
+  api-base-url: ${RAZORPAY_API_BASE_URL:https://api.razorpay.com/v1}
 
 management:
   endpoints:

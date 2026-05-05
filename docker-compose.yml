@@ -1,6 +1,129 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
   eureka-server:
     build:
       context: ./eureka-server
     ports:
       - "8761:8761"
+
+  auth-service:
+    build:
+      context: ./auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
+      QUICKBITE_RABBITMQ_ENABLED: true
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+    depends_on:
+      - eureka-server
+      - rabbitmq
+
+  restaurant-service:
+    build:
+      context: ./restaurant-service
+    ports:
+      - "8082:8082"
+    environment:
+      JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - eureka-server
+      - redis
+
+  order-service:
+    build:
+      context: ./order-service
+    ports:
+      - "8083:8083"
+    environment:
+      JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+
+  payment-service:
+    build:
+      context: ./payment-service
+    ports:
+      - "8084:8084"
+    environment:
+      JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+
+  delivery-service:
+    build:
+      context: ./delivery-service
+    ports:
+      - "8085:8085"
+    environment:
+      JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+
+  review-service:
+    build:
+      context: ./review-service
+    ports:
+      - "8086:8086"
+    environment:
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+
+  cart-service:
+    build:
+      context: ./cart-service
+    ports:
+      - "8088:8088"
+    environment:
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      AUTH_SERVICE_URL: lb://auth-service
+      RESTAURANT_SERVICE_URL: lb://restaurant-service
+      ORDER_SERVICE_URL: lb://order-service
+      PAYMENT_SERVICE_URL: lb://payment-service
+      REVIEW_SERVICE_URL: lb://review-service
+      CART_SERVICE_URL: lb://cart-service
+      DELIVERY_SERVICE_URL: lb://delivery-service
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_SlYxvOhJfVRqVE}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-upmDs62CHCiw1REUdWbRe77a}
+      RAZORPAY_CURRENCY: INR
+      RAZORPAY_API_BASE_URL: https://api.razorpay.com/v1
+    depends_on:
+      - eureka-server
+      - auth-service
+      - restaurant-service
+      - order-service
+      - payment-service
+      - delivery-service
+      - review-service
+      - cart-service
