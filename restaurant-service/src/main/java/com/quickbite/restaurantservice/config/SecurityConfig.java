@@ -26,10 +26,9 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/error", "/h2-console/**").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())
-                .headers(h -> h.frameOptions(f -> f.disable()))
                 .addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

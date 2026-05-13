@@ -22,10 +22,9 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/google").permitAll()
-                        .requestMatchers("/h2-console/**", "/error").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())
-                .headers(h -> h.frameOptions(f -> f.disable()))
                 .addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

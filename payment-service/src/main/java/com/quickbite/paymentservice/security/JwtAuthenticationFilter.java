@@ -23,7 +23,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return request.getServletPath().startsWith("/h2-console/");
+        return false;
     }
 
     @Override

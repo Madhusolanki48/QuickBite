@@ -22,6 +22,11 @@ services:
     ports:
       - "8081:8081"
     environment:
+      MYSQL_HOST: host.docker.internal
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: quickbite_auth
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root
       JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
       QUICKBITE_RABBITMQ_ENABLED: true
@@ -39,6 +44,11 @@ services:
     ports:
       - "8082:8082"
     environment:
+      MYSQL_HOST: host.docker.internal
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: quickbite_restaurant
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root
       JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
       REDIS_HOST: redis
@@ -53,6 +63,11 @@ services:
     ports:
       - "8083:8083"
     environment:
+      MYSQL_HOST: host.docker.internal
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: quickbite_order
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root
       JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
     depends_on:
@@ -64,6 +79,11 @@ services:
     ports:
       - "8084:8084"
     environment:
+      MYSQL_HOST: host.docker.internal
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: quickbite_payment
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root
       JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
     depends_on:
@@ -75,6 +95,11 @@ services:
     ports:
       - "8085:8085"
     environment:
+      MYSQL_HOST: host.docker.internal
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: quickbite_delivery
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root
       JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
     depends_on:
@@ -86,6 +111,11 @@ services:
     ports:
       - "8086:8086"
     environment:
+      MYSQL_HOST: host.docker.internal
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: quickbite_review
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
     depends_on:
       - eureka-server
@@ -96,6 +126,11 @@ services:
     ports:
       - "8088:8088"
     environment:
+      MYSQL_HOST: host.docker.internal
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: quickbite_cart
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
     depends_on:
       - eureka-server
