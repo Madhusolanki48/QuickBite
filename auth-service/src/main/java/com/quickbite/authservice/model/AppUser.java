@@ -37,6 +37,8 @@ public class AppUser {
     @Column(nullable = false, length = 20)
     private ApprovalStatus approvalStatus;
     @Column(nullable = false)
+    private boolean emailVerified;
+    @Column(nullable = false)
     private boolean enabled;
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

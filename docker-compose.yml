@@ -27,6 +27,9 @@ services:
       MYSQL_DATABASE: quickbite_auth
       MYSQL_USERNAME: root
       MYSQL_PASSWORD: root
+      MAIL_FROM: ${MAIL_FROM:-}
+      GMAIL_USERNAME: ${GMAIL_USERNAME:-}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
       JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
       QUICKBITE_RABBITMQ_ENABLED: true
@@ -68,6 +71,9 @@ services:
       MYSQL_DATABASE: quickbite_order
       MYSQL_USERNAME: root
       MYSQL_PASSWORD: root
+      MAIL_FROM: ${MAIL_FROM:-}
+      GMAIL_USERNAME: ${GMAIL_USERNAME:-}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
       JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
     depends_on:

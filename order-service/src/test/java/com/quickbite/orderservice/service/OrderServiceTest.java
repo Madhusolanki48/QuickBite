@@ -6,11 +6,11 @@ import com.quickbite.orderservice.model.FoodOrder;
 import com.quickbite.orderservice.model.OrderStatus;
 import com.quickbite.orderservice.model.PaymentStatus;
 import com.quickbite.orderservice.repository.OrderRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.MockitoAnnotations;
 
 import java.util.List;
 
@@ -18,15 +18,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
     @Mock
     private OrderRepository orderRepository;
+    @Mock
+    private MailService mailService;
     private OrderService orderService;
+    private AutoCloseable mocks;
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository);
+        mocks = MockitoAnnotations.openMocks(this);
+        orderService = new OrderService(orderRepository, mailService);
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        if (mocks != null) {
+            mocks.close();
+        }
     }
 
     @Test

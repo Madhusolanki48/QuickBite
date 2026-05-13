@@ -4,8 +4,11 @@ import com.quickbite.authservice.dto.*;
 import com.quickbite.authservice.exception.*;
 import com.quickbite.authservice.model.AppUser;
 import com.quickbite.authservice.model.ApprovalStatus;
+import com.quickbite.authservice.model.EmailToken;
+import com.quickbite.authservice.model.EmailTokenPurpose;
 import com.quickbite.authservice.model.Notification;
 import com.quickbite.authservice.model.Role;
+import com.quickbite.authservice.repository.EmailTokenRepository;
 import com.quickbite.authservice.repository.NotificationRepository;
 import com.quickbite.authservice.repository.UserRepository;
 import com.quickbite.authservice.security.GoogleTokenVerifier;
@@ -21,6 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,15 +33,19 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthService {
     private final UserRepository userRepository;
+    private final EmailTokenRepository emailTokenRepository;
     private final NotificationRepository notificationRepository;
     private final NotificationEventPublisher notificationEventPublisher;
+    private final MailService mailService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final GoogleTokenVerifier googleTokenVerifier;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmailIgnoreCase(request.email())) throw new ResourceAlreadyExistsException("Email is already registered");
+        String email = normalizeEmail(request.email());
+        if (userRepository.existsByEmailIgnoreCase(email)) throw new ResourceAlreadyExistsException("Email is already registered");
         if (userRepository.existsByPhoneNumber(request.phoneNumber())) throw new ResourceAlreadyExistsException("Phone number is already registered");
         Role role = request.role() == null ? Role.CUSTOMER : request.role();
         if (role == Role.ADMIN) {
@@ -48,20 +57,62 @@ public class AuthService {
         AppUser user = AppUser.builder()
                 .firstName(request.firstName())
                 .lastName(request.lastName())
-                .email(request.email().toLowerCase())
+                .email(email)
                 .phoneNumber(request.phoneNumber())
                 .restaurantId(request.restaurantId() != null ? request.restaurantId().trim() : null)
                 .password(passwordEncoder.encode(request.password()))
                 .role(role)
                 .approvalStatus(role == Role.RESTAURANT_OWNER ? ApprovalStatus.PENDING : ApprovalStatus.APPROVED)
-                .enabled(role != Role.RESTAURANT_OWNER)
+                .emailVerified(false)
+                .enabled(false)
                 .build();
         AppUser saved = userRepository.saveAndFlush(user);
-        return new AuthResponse(jwtService.generateToken(saved), "Bearer", jwtService.getExpirationMs(), toResponse(saved));
+        sendAndStoreRegistrationOtp(saved);
+        return new AuthResponse(null, null, 0, toResponse(saved));
     }
+
+    public AuthResponse verifyRegistration(VerifyOtpRequest request) {
+        String email = normalizeEmail(request.email());
+        AppUser user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new InvalidCredentialsException("Account not found"));
+        EmailToken token = emailTokenRepository
+                .findByEmailIgnoreCaseAndTokenAndPurposeAndUsedAtIsNullAndExpiresAtAfter(
+                        email,
+                        request.otp().trim(),
+                        EmailTokenPurpose.REGISTRATION_OTP,
+                        Instant.now())
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid or expired verification code"));
+        token.setUsedAt(Instant.now());
+        emailTokenRepository.save(token);
+        user.setEmailVerified(true);
+        if (user.getRole() != Role.RESTAURANT_OWNER) {
+            user.setEnabled(true);
+        }
+        AppUser saved = userRepository.save(user);
+        mailService.sendWelcomeEmail(saved);
+        if (saved.isEnabled()) {
+            return new AuthResponse(jwtService.generateToken(saved), "Bearer", jwtService.getExpirationMs(), toResponse(saved));
+        }
+        return new AuthResponse(null, null, 0, toResponse(saved));
+    }
+
+    public MessageResponse resendRegistrationOtp(ResendRegistrationOtpRequest request) {
+        String email = normalizeEmail(request.email());
+        AppUser user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new InvalidCredentialsException("Account not found"));
+        if (user.isEmailVerified()) {
+            return new MessageResponse("This account is already verified.");
+        }
+        sendAndStoreRegistrationOtp(user);
+        return new MessageResponse("A new verification code has been sent to your email.");
+    }
+
     public AuthResponse login(LoginRequest request) {
-        String email = request.email().toLowerCase();
+        String email = normalizeEmail(request.email());
         AppUser user = userRepository.findByEmailIgnoreCase(email).orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
+        if (!user.isEmailVerified()) {
+            throw new InvalidCredentialsException("Please verify your email address first");
+        }
         if (!user.isEnabled()) {
             throw new InvalidCredentialsException("Account is pending admin approval");
         }
@@ -76,22 +127,74 @@ public class AuthService {
         }
 
         String email = profile.email().toLowerCase();
+        final boolean[] created = {false};
         AppUser user = userRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
+            created[0] = true;
             String firstName = isBlank(profile.firstName()) ? deriveFirstName(email) : profile.firstName().trim();
             String lastName = isBlank(profile.lastName()) ? "Google" : profile.lastName().trim();
-            AppUser created = AppUser.builder()
+            AppUser newUser = AppUser.builder()
                     .firstName(firstName)
                     .lastName(lastName)
                     .email(email)
                     .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                     .role(Role.CUSTOMER)
                     .approvalStatus(ApprovalStatus.APPROVED)
+                    .emailVerified(true)
                     .enabled(true)
                     .build();
-            return userRepository.saveAndFlush(created);
+            AppUser saved = userRepository.saveAndFlush(newUser);
+            return saved;
         });
 
+        if (!user.isEmailVerified()) {
+            user.setEmailVerified(true);
+            if (user.getRole() != Role.RESTAURANT_OWNER) {
+                user.setEnabled(true);
+            }
+            user = userRepository.save(user);
+        }
+        if (created[0]) {
+            mailService.sendWelcomeEmail(user);
+        }
+
         return new AuthResponse(jwtService.generateToken(user), "Bearer", jwtService.getExpirationMs(), toResponse(user));
+    }
+
+    public MessageResponse forgotPassword(ForgotPasswordRequest request) {
+        String email = normalizeEmail(request.email());
+        userRepository.findByEmailIgnoreCase(email).ifPresent(user -> {
+            if (!user.isEmailVerified()) {
+                return;
+            }
+            emailTokenRepository.deleteByEmailIgnoreCaseAndPurposeAndUsedAtIsNull(user.getEmail(), EmailTokenPurpose.PASSWORD_RESET);
+            String otp = generateOtp();
+            emailTokenRepository.save(EmailToken.builder()
+                    .email(user.getEmail())
+                    .token(otp)
+                    .purpose(EmailTokenPurpose.PASSWORD_RESET)
+                    .expiresAt(Instant.now().plus(10, ChronoUnit.MINUTES))
+                    .build());
+            mailService.sendPasswordResetOtp(user, otp);
+        });
+        return new MessageResponse("If the email exists, a password reset code has been sent.");
+    }
+
+    public MessageResponse resetPassword(ResetPasswordRequest request) {
+        String email = normalizeEmail(request.email());
+        AppUser user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new InvalidCredentialsException("Account not found"));
+        EmailToken token = emailTokenRepository
+                .findByEmailIgnoreCaseAndTokenAndPurposeAndUsedAtIsNullAndExpiresAtAfter(
+                        email,
+                        request.otp().trim(),
+                        EmailTokenPurpose.PASSWORD_RESET,
+                        Instant.now())
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid or expired reset code"));
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+        token.setUsedAt(Instant.now());
+        emailTokenRepository.save(token);
+        return new MessageResponse("Password has been reset successfully.");
     }
     public UserResponse getCurrentUser(Authentication authentication) {
         String email = authentication != null ? authentication.getName() : null;
@@ -311,5 +414,26 @@ public class AuthService {
             return "Google";
         }
         return Character.toUpperCase(base.charAt(0)) + base.substring(1);
+    }
+
+    private void sendAndStoreRegistrationOtp(AppUser user) {
+        emailTokenRepository.deleteByEmailIgnoreCaseAndPurposeAndUsedAtIsNull(user.getEmail(), EmailTokenPurpose.REGISTRATION_OTP);
+        String otp = generateOtp();
+        emailTokenRepository.save(EmailToken.builder()
+                .email(user.getEmail())
+                .token(otp)
+                .purpose(EmailTokenPurpose.REGISTRATION_OTP)
+                .expiresAt(Instant.now().plus(10, ChronoUnit.MINUTES))
+                .build());
+        mailService.sendRegistrationOtp(user, otp);
+    }
+
+    private String generateOtp() {
+        int code = 100000 + secureRandom.nextInt(900000);
+        return Integer.toString(code);
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase();
     }
 }

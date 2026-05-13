@@ -31,6 +31,27 @@ public class AuthController {
         return ResponseEntity.ok(authService.googleLogin(request));
     }
 
+    @PostMapping("/verify-registration")
+    public ResponseEntity<AuthResponse> verifyRegistration(@Valid @RequestBody VerifyOtpRequest request) {
+        return ResponseEntity.ok(authService.verifyRegistration(request));
+    }
+
+    @PostMapping("/resend-registration-otp")
+    public ResponseEntity<MessageResponse> resendRegistrationOtp(
+            @Valid @RequestBody ResendRegistrationOtpRequest request) {
+        return ResponseEntity.ok(authService.resendRegistrationOtp(request));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return ResponseEntity.ok(authService.forgotPassword(request));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(authService.resetPassword(request));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(Authentication authentication) {
         return ResponseEntity.ok(authService.getCurrentUser(authentication));

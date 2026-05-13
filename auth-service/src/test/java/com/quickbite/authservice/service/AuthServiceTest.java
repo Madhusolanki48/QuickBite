@@ -7,6 +7,7 @@ import com.quickbite.authservice.dto.RegisterRequest;
 import com.quickbite.authservice.model.AppUser;
 import com.quickbite.authservice.model.Role;
 import com.quickbite.authservice.messaging.NotificationEventPublisher;
+import com.quickbite.authservice.repository.EmailTokenRepository;
 import com.quickbite.authservice.repository.NotificationRepository;
 import com.quickbite.authservice.repository.UserRepository;
 import com.quickbite.authservice.security.GoogleTokenVerifier;
@@ -29,8 +30,10 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
     @Mock private UserRepository userRepository;
+    @Mock private EmailTokenRepository emailTokenRepository;
     @Mock private NotificationRepository notificationRepository;
     @Mock private NotificationEventPublisher notificationEventPublisher;
+    @Mock private MailService mailService;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtService jwtService;
     @Mock private AuthenticationManager authenticationManager;
@@ -40,7 +43,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userRepository, notificationRepository, notificationEventPublisher, passwordEncoder, jwtService, authenticationManager, googleTokenVerifier);
+        authService = new AuthService(userRepository, emailTokenRepository, notificationRepository, notificationEventPublisher, mailService, passwordEncoder, jwtService, authenticationManager, googleTokenVerifier);
     }
 
     @Test
@@ -53,14 +56,13 @@ class AuthServiceTest {
             user.setId(1L);
             return user;
         });
-        when(jwtService.generateToken(any(AppUser.class))).thenReturn("jwt");
-        when(jwtService.getExpirationMs()).thenReturn(86400000L);
 
         var response = authService.register(new RegisterRequest("Sonam", "Sharma", "sonam@example.com", "9876543210", "Password123", Role.CUSTOMER, null));
 
-        assertThat(response.token()).isEqualTo("jwt");
+        assertThat(response.token()).isNull();
         assertThat(response.user().email()).isEqualTo("sonam@example.com");
         verify(userRepository).saveAndFlush(any(AppUser.class));
+        verify(mailService).sendRegistrationOtp(any(AppUser.class), any());
     }
 
     @Test
@@ -79,6 +81,7 @@ class AuthServiceTest {
                 .email("sonam@example.com")
                 .password("encoded")
                 .role(Role.CUSTOMER)
+                .emailVerified(true)
                 .enabled(true)
                 .build();
 
