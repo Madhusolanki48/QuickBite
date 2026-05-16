@@ -23,6 +23,15 @@ public class JwtService {
     public String generateToken(AppUser user) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", user.getRole().name());
+        if (user.getApprovalStatus() != null) {
+            claims.put("approvalStatus", user.getApprovalStatus().name());
+        }
+        if (user.getRestaurantId() != null && !user.getRestaurantId().isBlank()) {
+            claims.put("restaurantId", user.getRestaurantId());
+        }
+        if (user.getRestaurantName() != null && !user.getRestaurantName().isBlank()) {
+            claims.put("restaurantName", user.getRestaurantName());
+        }
         if (user.getId() != null) {
             claims.put("userId", user.getId());
         }

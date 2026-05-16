@@ -38,18 +38,18 @@ public class AuthDataSeeder implements ApplicationRunner {
 
     private void seedAdmin() {
         seedUser("admin@quickbite.dev", "Admin", "QuickBite", Role.ADMIN, null, null, "Admin@1234",
-                ApprovalStatus.APPROVED, true);
+                ApprovalStatus.APPROVED, true, true);
     }
 
     private void seedOwner(String email, String firstName, String lastName, String restaurantId, String restaurantName,
             String rawPassword) {
         seedUser(email, firstName, lastName, Role.RESTAURANT_OWNER, restaurantId, restaurantName, rawPassword,
-                ApprovalStatus.APPROVED, true);
+                ApprovalStatus.APPROVED, true, true);
     }
 
     private void seedDeliveryAgent(String email, String firstName, String lastName, String rawPassword) {
         seedUser(email, firstName, lastName, Role.DELIVERY_PARTNER, null, null, rawPassword, ApprovalStatus.APPROVED,
-                true);
+                true, true);
     }
 
     private void seedUser(
@@ -61,23 +61,23 @@ public class AuthDataSeeder implements ApplicationRunner {
             String restaurantName,
             String rawPassword,
             ApprovalStatus approvalStatus,
-            boolean enabled) {
-        if (userRepository.existsByEmailIgnoreCase(email)) {
-            return;
+            boolean enabled,
+            boolean emailVerified) {
+        AppUser user = userRepository.findByEmailIgnoreCase(email)
+                .orElseGet(AppUser::new);
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setEmail(email.toLowerCase());
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setRole(role);
+        user.setRestaurantId(restaurantId);
+        user.setRestaurantName(restaurantName);
+        user.setApprovalStatus(approvalStatus);
+        user.setEnabled(enabled);
+        user.setEmailVerified(emailVerified);
+        if (user.getPhoneNumber() == null) {
+            user.setPhoneNumber(null);
         }
-
-        AppUser user = AppUser.builder()
-                .firstName(firstName)
-                .lastName(lastName)
-                .email(email.toLowerCase())
-                .password(passwordEncoder.encode(rawPassword))
-                .role(role)
-                .restaurantId(restaurantId)
-                .restaurantName(restaurantName)
-                .approvalStatus(approvalStatus)
-                .enabled(enabled)
-                .phoneNumber(null)
-                .build();
         userRepository.save(user);
     }
 }

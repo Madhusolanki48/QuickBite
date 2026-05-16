@@ -15,4 +15,11 @@ public interface EmailTokenRepository extends JpaRepository<EmailToken, Long> {
             Instant now);
 
     void deleteByEmailIgnoreCaseAndPurposeAndUsedAtIsNull(String email, EmailTokenPurpose purpose);
+
+    void deleteByEmailIgnoreCaseAndPurpose(String email, EmailTokenPurpose purpose);
+
+    Optional<EmailToken> findFirstByEmailIgnoreCaseAndPurposeAndUsedAtIsNullAndExpiresAtAfter(
+            String email,
+            EmailTokenPurpose purpose,
+            Instant now);
 }

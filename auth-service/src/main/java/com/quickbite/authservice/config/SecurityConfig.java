@@ -23,8 +23,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/google",
                                 "/api/auth/verify-registration", "/api/auth/resend-registration-otp",
-                                "/api/auth/forgot-password",
-                                "/api/auth/reset-password")
+                                "/api/auth/forgot-password", "/api/auth/verify-otp", "/api/auth/verify-reset-otp",
+                                "/api/auth/reset-password",
+                                "/auth/login", "/auth/register", "/auth/google",
+                                "/auth/verify-registration", "/auth/resend-registration-otp",
+                                "/auth/forgot-password", "/auth/verify-otp", "/auth/verify-reset-otp",
+                                "/auth/reset-password")
                         .permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: ${PORT:8081}
 spring:
   application:
     name: auth-service
@@ -28,15 +28,18 @@ spring:
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
 app:
   mail:
     from: ${MAIL_FROM:${spring.mail.username}}
 jwt:
-  secret: ${JWT_SECRET:quickbite-auth-default-secret-key-change-me-1234567890}
+  secret: ${JWT_SECRET:}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 quickbite:
   google:
-    client-id: ${GOOGLE_CLIENT_ID:657167715760-nl47ceicarqnu2q296mpl2fmm3oubh5t.apps.googleusercontent.com}
+    client-id: ${GOOGLE_CLIENT_ID:}
 eureka:
   client:
     service-url:

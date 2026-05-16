@@ -30,7 +30,7 @@ services:
       MAIL_FROM: ${MAIL_FROM:-}
       GMAIL_USERNAME: ${GMAIL_USERNAME:-}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
-      JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
+      JWT_SECRET: ${JWT_SECRET:-}
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
       QUICKBITE_RABBITMQ_ENABLED: true
       RABBITMQ_HOST: rabbitmq
@@ -52,7 +52,7 @@ services:
       MYSQL_DATABASE: quickbite_restaurant
       MYSQL_USERNAME: root
       MYSQL_PASSWORD: root
-      JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
+      JWT_SECRET: ${JWT_SECRET:-}
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -74,7 +74,7 @@ services:
       MAIL_FROM: ${MAIL_FROM:-}
       GMAIL_USERNAME: ${GMAIL_USERNAME:-}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
-      JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
+      JWT_SECRET: ${JWT_SECRET:-}
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
     depends_on:
       - eureka-server
@@ -90,7 +90,7 @@ services:
       MYSQL_DATABASE: quickbite_payment
       MYSQL_USERNAME: root
       MYSQL_PASSWORD: root
-      JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
+      JWT_SECRET: ${JWT_SECRET:-}
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
     depends_on:
       - eureka-server
@@ -106,7 +106,7 @@ services:
       MYSQL_DATABASE: quickbite_delivery
       MYSQL_USERNAME: root
       MYSQL_PASSWORD: root
-      JWT_SECRET: quickbite-auth-secret-key-change-me-32-bytes-minimum
+      JWT_SECRET: ${JWT_SECRET:-}
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
     depends_on:
       - eureka-server
@@ -147,7 +147,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      AUTH_SERVICE_URL: lb://auth-service
+      AUTH_SERVICE_URL: http://auth-service:8081
       RESTAURANT_SERVICE_URL: lb://restaurant-service
       ORDER_SERVICE_URL: lb://order-service
       PAYMENT_SERVICE_URL: lb://payment-service
@@ -155,8 +155,8 @@ services:
       CART_SERVICE_URL: lb://cart-service
       DELIVERY_SERVICE_URL: lb://delivery-service
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
-      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_SlYxvOhJfVRqVE}
-      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-upmDs62CHCiw1REUdWbRe77a}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       RAZORPAY_CURRENCY: INR
       RAZORPAY_API_BASE_URL: https://api.razorpay.com/v1
     depends_on:

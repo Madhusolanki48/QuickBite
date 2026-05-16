@@ -4,7 +4,12 @@ import com.quickbite.authservice.dto.GoogleLoginRequest;
 import com.quickbite.authservice.dto.GoogleProfile;
 import com.quickbite.authservice.dto.LoginRequest;
 import com.quickbite.authservice.dto.RegisterRequest;
+import com.quickbite.authservice.dto.ForgotPasswordRequest;
+import com.quickbite.authservice.dto.ResetPasswordRequest;
+import com.quickbite.authservice.dto.VerifyOtpRequest;
 import com.quickbite.authservice.model.AppUser;
+import com.quickbite.authservice.model.EmailToken;
+import com.quickbite.authservice.model.EmailTokenPurpose;
 import com.quickbite.authservice.model.Role;
 import com.quickbite.authservice.messaging.NotificationEventPublisher;
 import com.quickbite.authservice.repository.EmailTokenRepository;
@@ -21,10 +26,12 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,10 +55,9 @@ class AuthServiceTest {
 
     @Test
     void registerCreatesUserAndReturnsToken() {
-        when(userRepository.existsByEmailIgnoreCase("sonam@example.com")).thenReturn(false);
         when(userRepository.existsByPhoneNumber("9876543210")).thenReturn(false);
         when(passwordEncoder.encode("Password123")).thenReturn("encoded");
-        when(userRepository.saveAndFlush(any(AppUser.class))).thenAnswer(invocation -> {
+        when(userRepository.save(any(AppUser.class))).thenAnswer(invocation -> {
             AppUser user = invocation.getArgument(0);
             user.setId(1L);
             return user;
@@ -61,7 +67,7 @@ class AuthServiceTest {
 
         assertThat(response.token()).isNull();
         assertThat(response.user().email()).isEqualTo("sonam@example.com");
-        verify(userRepository).saveAndFlush(any(AppUser.class));
+        verify(userRepository).save(any(AppUser.class));
         verify(mailService).sendRegistrationOtp(any(AppUser.class), any());
     }
 
@@ -100,7 +106,7 @@ class AuthServiceTest {
         when(googleTokenVerifier.verify("google-credential")).thenReturn(new GoogleProfile("sub", "newuser@example.com", "New", "User", null, true));
         when(userRepository.findByEmailIgnoreCase("newuser@example.com")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(any())).thenReturn("encoded");
-        when(userRepository.saveAndFlush(any(AppUser.class))).thenAnswer(invocation -> {
+        when(userRepository.save(any(AppUser.class))).thenAnswer(invocation -> {
             AppUser user = invocation.getArgument(0);
             user.setId(5L);
             return user;
@@ -112,8 +118,110 @@ class AuthServiceTest {
 
         assertThat(response.token()).isEqualTo("google-jwt");
         ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
-        verify(userRepository).saveAndFlush(captor.capture());
+        verify(userRepository).save(captor.capture());
         assertThat(captor.getValue().getRole()).isEqualTo(Role.CUSTOMER);
         assertThat(captor.getValue().getEmail()).isEqualTo("newuser@example.com");
+    }
+
+    @Test
+    void forgotPasswordReturnsNotFoundWhenUserMissing() {
+        when(userRepository.findByEmailIgnoreCase("missing@example.com")).thenReturn(Optional.empty());
+
+        var response = authService.forgotPassword(new ForgotPasswordRequest("missing@example.com"));
+
+        assertThat(response.success()).isFalse();
+        assertThat(response.message()).isEqualTo("User not found");
+        verifyNoInteractions(mailService);
+    }
+
+    @Test
+    void forgotPasswordSendsOtpWhenUserExists() {
+        AppUser user = AppUser.builder()
+                .id(10L)
+                .firstName("Sonam")
+                .lastName("Sharma")
+                .email("sonam@example.com")
+                .password("encoded")
+                .role(Role.CUSTOMER)
+                .emailVerified(true)
+                .enabled(true)
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase("sonam@example.com")).thenReturn(Optional.of(user));
+        when(emailTokenRepository.save(any(EmailToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = authService.forgotPassword(new ForgotPasswordRequest("sonam@example.com"));
+
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isEqualTo("OTP sent successfully");
+        verify(mailService).sendPasswordResetOtp(eq(user), any(String.class));
+        verify(emailTokenRepository).deleteByEmailIgnoreCaseAndPurpose("sonam@example.com", EmailTokenPurpose.PASSWORD_RESET);
+        verify(emailTokenRepository).deleteByEmailIgnoreCaseAndPurpose("sonam@example.com", EmailTokenPurpose.PASSWORD_RESET_SESSION);
+    }
+
+    @Test
+    void verifyPasswordResetOtpCreatesSession() {
+        AppUser user = AppUser.builder()
+                .id(10L)
+                .firstName("Sonam")
+                .lastName("Sharma")
+                .email("sonam@example.com")
+                .password("encoded")
+                .role(Role.CUSTOMER)
+                .emailVerified(true)
+                .enabled(true)
+                .build();
+        EmailToken token = EmailToken.builder()
+                .id(1L)
+                .email("sonam@example.com")
+                .token("123456")
+                .purpose(EmailTokenPurpose.PASSWORD_RESET)
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase("sonam@example.com")).thenReturn(Optional.of(user));
+        when(emailTokenRepository.findByEmailIgnoreCaseAndTokenAndPurposeAndUsedAtIsNullAndExpiresAtAfter(
+                eq("sonam@example.com"), eq("123456"), eq(EmailTokenPurpose.PASSWORD_RESET), any(Instant.class))).thenReturn(Optional.of(token));
+        when(emailTokenRepository.save(any(EmailToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = authService.verifyPasswordResetOtp(new VerifyOtpRequest("sonam@example.com", "123456"));
+
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isEqualTo("OTP verified");
+        verify(emailTokenRepository).deleteByEmailIgnoreCaseAndPurpose("sonam@example.com", EmailTokenPurpose.PASSWORD_RESET_SESSION);
+        verify(emailTokenRepository).deleteByEmailIgnoreCaseAndPurpose("sonam@example.com", EmailTokenPurpose.PASSWORD_RESET);
+    }
+
+    @Test
+    void resetPasswordUpdatesPasswordWhenSessionExists() {
+        AppUser user = AppUser.builder()
+                .id(10L)
+                .firstName("Sonam")
+                .lastName("Sharma")
+                .email("sonam@example.com")
+                .password("encoded")
+                .role(Role.CUSTOMER)
+                .emailVerified(true)
+                .enabled(true)
+                .build();
+        EmailToken session = EmailToken.builder()
+                .id(2L)
+                .email("sonam@example.com")
+                .token("session-token")
+                .purpose(EmailTokenPurpose.PASSWORD_RESET_SESSION)
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase("sonam@example.com")).thenReturn(Optional.of(user));
+        when(emailTokenRepository.findFirstByEmailIgnoreCaseAndPurposeAndUsedAtIsNullAndExpiresAtAfter(
+                eq("sonam@example.com"), eq(EmailTokenPurpose.PASSWORD_RESET_SESSION), any(Instant.class))).thenReturn(Optional.of(session));
+        when(passwordEncoder.encode("Password@123")).thenReturn("hashed");
+        when(userRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = authService.resetPassword(new ResetPasswordRequest("sonam@example.com", "Password@123"));
+
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isEqualTo("Password reset successfully");
+        verify(passwordEncoder).encode("Password@123");
+        verify(emailTokenRepository).deleteByEmailIgnoreCaseAndPurpose("sonam@example.com", EmailTokenPurpose.PASSWORD_RESET);
+        verify(emailTokenRepository).deleteByEmailIgnoreCaseAndPurpose("sonam@example.com", EmailTokenPurpose.PASSWORD_RESET_SESSION);
     }
 }

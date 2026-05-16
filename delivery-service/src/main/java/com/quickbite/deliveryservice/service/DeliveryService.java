@@ -8,6 +8,7 @@ import com.quickbite.deliveryservice.model.DeliveryStatus;
 import com.quickbite.deliveryservice.repository.DeliveryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -18,6 +19,8 @@ import java.util.List;
 public class DeliveryService {
     private final DeliveryRepository deliveryRepository;
     private final WebClient.Builder webClientBuilder;
+    @Value("${ORDER_SERVICE_URL:http://order-service}")
+    private String orderServiceUrl;
 
     public List<DeliveryResponse> findAll() {
         return deliveryRepository.findAll().stream().map(this::toResponse).toList();
@@ -51,7 +54,7 @@ public class DeliveryService {
         try {
             webClientBuilder.build()
                     .get()
-                    .uri("http://order-service/api/orders/internal/{id}", orderId)
+                    .uri(orderServiceUrl + "/api/orders/internal/{id}", orderId)
                     .retrieve()
                     .toBodilessEntity()
                     .block();

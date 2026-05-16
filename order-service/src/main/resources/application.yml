@@ -1,5 +1,5 @@
 server:
-  port: 8083
+  port: ${PORT:8083}
 spring:
   application:
     name: order-service
@@ -24,7 +24,7 @@ app:
   mail:
     from: ${MAIL_FROM:${spring.mail.username}}
 jwt:
-  secret: ${JWT_SECRET:quickbite-auth-default-secret-key-change-me-1234567890}
+  secret: ${JWT_SECRET:}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 eureka:
   client:

@@ -33,7 +33,7 @@ public class Notification {
     @Column(nullable = false, length = 40)
     private String category;
 
-    @Column(nullable = false)
+    @Column(name = "is_read", nullable = false)
     private boolean read;
 
     private Instant readAt;

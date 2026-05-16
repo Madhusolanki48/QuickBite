@@ -1,5 +1,5 @@
 server:
-  port: 8084
+  port: ${PORT:8084}
 spring:
   application:
     name: payment-service
@@ -13,7 +13,7 @@ spring:
       ddl-auto: update
     show-sql: true
 jwt:
-  secret: ${JWT_SECRET:quickbite-auth-default-secret-key-change-me-1234567890}
+  secret: ${JWT_SECRET:}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 eureka:
   client:

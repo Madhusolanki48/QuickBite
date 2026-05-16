@@ -30,7 +30,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 request.getServletPath().startsWith("/api/auth/verify-registration") ||
                 request.getServletPath().startsWith("/api/auth/resend-registration-otp") ||
                 request.getServletPath().startsWith("/api/auth/forgot-password") ||
-                request.getServletPath().startsWith("/api/auth/reset-password");
+                request.getServletPath().startsWith("/api/auth/verify-otp") ||
+                request.getServletPath().startsWith("/api/auth/verify-reset-otp") ||
+                request.getServletPath().startsWith("/api/auth/reset-password") ||
+                request.getServletPath().startsWith("/auth/login") ||
+                request.getServletPath().startsWith("/auth/register") ||
+                request.getServletPath().startsWith("/auth/google") ||
+                request.getServletPath().startsWith("/auth/verify-registration") ||
+                request.getServletPath().startsWith("/auth/resend-registration-otp") ||
+                request.getServletPath().startsWith("/auth/forgot-password") ||
+                request.getServletPath().startsWith("/auth/verify-otp") ||
+                request.getServletPath().startsWith("/auth/verify-reset-otp") ||
+                request.getServletPath().startsWith("/auth/reset-password");
     }
 
     @Override

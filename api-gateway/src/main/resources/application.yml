@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   application:
@@ -33,6 +33,11 @@ spring:
           uri: ${AUTH_SERVICE_URL:lb://auth-service}
           predicates:
             - Path=/api/auth/**
+
+        - id: auth-service-alias
+          uri: ${AUTH_SERVICE_URL:lb://auth-service}
+          predicates:
+            - Path=/auth/**
 
         - id: restaurant-service
           uri: ${RESTAURANT_SERVICE_URL:lb://restaurant-service}
@@ -84,8 +89,8 @@ eureka:
     prefer-ip-address: true
 
 razorpay:
-  key-id: ${RAZORPAY_KEY_ID:rzp_test_SlYxvOhJfVRqVE}
-  key-secret: ${RAZORPAY_KEY_SECRET:upmDs62CHCiw1REUdWbRe77a}
+  key-id: ${RAZORPAY_KEY_ID:}
+  key-secret: ${RAZORPAY_KEY_SECRET:}
   currency: ${RAZORPAY_CURRENCY:INR}
   api-base-url: ${RAZORPAY_API_BASE_URL:https://api.razorpay.com/v1}
 

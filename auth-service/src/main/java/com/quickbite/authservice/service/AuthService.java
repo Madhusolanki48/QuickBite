@@ -15,6 +15,7 @@ import com.quickbite.authservice.security.GoogleTokenVerifier;
 import com.quickbite.authservice.messaging.NotificationEvent;
 import com.quickbite.authservice.messaging.NotificationEventPublisher;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -22,6 +23,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -31,6 +33,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
     private final UserRepository userRepository;
     private final EmailTokenRepository emailTokenRepository;
@@ -43,9 +46,17 @@ public class AuthService {
     private final GoogleTokenVerifier googleTokenVerifier;
     private final SecureRandom secureRandom = new SecureRandom();
 
+    @Transactional
     public AuthResponse register(RegisterRequest request) {
         String email = normalizeEmail(request.email());
-        if (userRepository.existsByEmailIgnoreCase(email)) throw new ResourceAlreadyExistsException("Email is already registered");
+        AppUser existing = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (existing != null) {
+            if (!existing.isEmailVerified()) {
+                sendAndStoreRegistrationOtp(existing);
+                return new AuthResponse(null, null, 0, toResponse(existing));
+            }
+            throw new ResourceAlreadyExistsException("Email is already registered");
+        }
         if (userRepository.existsByPhoneNumber(request.phoneNumber())) throw new ResourceAlreadyExistsException("Phone number is already registered");
         Role role = request.role() == null ? Role.CUSTOMER : request.role();
         if (role == Role.ADMIN) {
@@ -66,7 +77,7 @@ public class AuthService {
                 .emailVerified(false)
                 .enabled(false)
                 .build();
-        AppUser saved = userRepository.saveAndFlush(user);
+        AppUser saved = userRepository.save(user);
         sendAndStoreRegistrationOtp(saved);
         return new AuthResponse(null, null, 0, toResponse(saved));
     }
@@ -90,12 +101,16 @@ public class AuthService {
         }
         AppUser saved = userRepository.save(user);
         mailService.sendWelcomeEmail(saved);
+        if (saved.getRole() == Role.RESTAURANT_OWNER || saved.getRole() == Role.DELIVERY_PARTNER) {
+            notifyAdminForPendingApproval(saved);
+        }
         if (saved.isEnabled()) {
             return new AuthResponse(jwtService.generateToken(saved), "Bearer", jwtService.getExpirationMs(), toResponse(saved));
         }
         return new AuthResponse(null, null, 0, toResponse(saved));
     }
 
+    @Transactional
     public MessageResponse resendRegistrationOtp(ResendRegistrationOtpRequest request) {
         String email = normalizeEmail(request.email());
         AppUser user = userRepository.findByEmailIgnoreCase(email)
@@ -142,7 +157,7 @@ public class AuthService {
                     .emailVerified(true)
                     .enabled(true)
                     .build();
-            AppUser saved = userRepository.saveAndFlush(newUser);
+            AppUser saved = userRepository.save(newUser);
             return saved;
         });
 
@@ -160,13 +175,19 @@ public class AuthService {
         return new AuthResponse(jwtService.generateToken(user), "Bearer", jwtService.getExpirationMs(), toResponse(user));
     }
 
-    public MessageResponse forgotPassword(ForgotPasswordRequest request) {
-        String email = normalizeEmail(request.email());
-        userRepository.findByEmailIgnoreCase(email).ifPresent(user -> {
-            if (!user.isEmailVerified()) {
-                return;
+    @Transactional
+    public PasswordResetResponse forgotPassword(ForgotPasswordRequest request) {
+        log.info("Forgot password request received");
+        try {
+            String email = normalizeEmail(request.email());
+            AppUser user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+            if (user == null) {
+                return new PasswordResetResponse(false, "User not found");
             }
-            emailTokenRepository.deleteByEmailIgnoreCaseAndPurposeAndUsedAtIsNull(user.getEmail(), EmailTokenPurpose.PASSWORD_RESET);
+
+            emailTokenRepository.deleteByEmailIgnoreCaseAndPurpose(user.getEmail(), EmailTokenPurpose.PASSWORD_RESET);
+            emailTokenRepository.deleteByEmailIgnoreCaseAndPurpose(user.getEmail(), EmailTokenPurpose.PASSWORD_RESET_SESSION);
+
             String otp = generateOtp();
             emailTokenRepository.save(EmailToken.builder()
                     .email(user.getEmail())
@@ -175,26 +196,82 @@ public class AuthService {
                     .expiresAt(Instant.now().plus(10, ChronoUnit.MINUTES))
                     .build());
             mailService.sendPasswordResetOtp(user, otp);
-        });
-        return new MessageResponse("If the email exists, a password reset code has been sent.");
+            log.info("OTP sent");
+            return new PasswordResetResponse(true, "OTP sent successfully");
+        } catch (Exception ex) {
+            log.error("Failed to process forgot password request", ex);
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return new PasswordResetResponse(false, "Unable to send OTP");
+        }
     }
 
-    public MessageResponse resetPassword(ResetPasswordRequest request) {
-        String email = normalizeEmail(request.email());
-        AppUser user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new InvalidCredentialsException("Account not found"));
-        EmailToken token = emailTokenRepository
-                .findByEmailIgnoreCaseAndTokenAndPurposeAndUsedAtIsNullAndExpiresAtAfter(
-                        email,
-                        request.otp().trim(),
-                        EmailTokenPurpose.PASSWORD_RESET,
-                        Instant.now())
-                .orElseThrow(() -> new InvalidCredentialsException("Invalid or expired reset code"));
-        user.setPassword(passwordEncoder.encode(request.newPassword()));
-        userRepository.save(user);
-        token.setUsedAt(Instant.now());
-        emailTokenRepository.save(token);
-        return new MessageResponse("Password has been reset successfully.");
+    @Transactional
+    public PasswordResetResponse verifyPasswordResetOtp(VerifyOtpRequest request) {
+        log.info("Verify password reset OTP request received");
+        try {
+            String email = normalizeEmail(request.email());
+            AppUser user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+            if (user == null) {
+                return new PasswordResetResponse(false, "User not found");
+            }
+
+            EmailToken otpToken = emailTokenRepository
+                    .findByEmailIgnoreCaseAndTokenAndPurposeAndUsedAtIsNullAndExpiresAtAfter(
+                            email,
+                            request.otp().trim(),
+                            EmailTokenPurpose.PASSWORD_RESET,
+                            Instant.now())
+                    .orElse(null);
+            if (otpToken == null) {
+                return new PasswordResetResponse(false, "Invalid or expired OTP");
+            }
+
+            emailTokenRepository.deleteByEmailIgnoreCaseAndPurpose(user.getEmail(), EmailTokenPurpose.PASSWORD_RESET_SESSION);
+            emailTokenRepository.deleteByEmailIgnoreCaseAndPurpose(user.getEmail(), EmailTokenPurpose.PASSWORD_RESET);
+            emailTokenRepository.save(EmailToken.builder()
+                    .email(user.getEmail())
+                    .token(UUID.randomUUID().toString())
+                    .purpose(EmailTokenPurpose.PASSWORD_RESET_SESSION)
+                    .expiresAt(Instant.now().plus(15, ChronoUnit.MINUTES))
+                    .build());
+            return new PasswordResetResponse(true, "OTP verified");
+        } catch (Exception ex) {
+            log.error("Failed to verify password reset OTP", ex);
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return new PasswordResetResponse(false, "Unable to verify OTP");
+        }
+    }
+
+    @Transactional
+    public PasswordResetResponse resetPassword(ResetPasswordRequest request) {
+        log.info("Reset password request received");
+        try {
+            String email = normalizeEmail(request.email());
+            AppUser user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+            if (user == null) {
+                return new PasswordResetResponse(false, "User not found");
+            }
+
+            EmailToken sessionToken = emailTokenRepository
+                    .findFirstByEmailIgnoreCaseAndPurposeAndUsedAtIsNullAndExpiresAtAfter(
+                            email,
+                            EmailTokenPurpose.PASSWORD_RESET_SESSION,
+                            Instant.now())
+                    .orElse(null);
+            if (sessionToken == null) {
+                return new PasswordResetResponse(false, "OTP not verified or session expired");
+            }
+
+            user.setPassword(passwordEncoder.encode(request.newPassword()));
+            userRepository.save(user);
+            emailTokenRepository.deleteByEmailIgnoreCaseAndPurpose(user.getEmail(), EmailTokenPurpose.PASSWORD_RESET);
+            emailTokenRepository.deleteByEmailIgnoreCaseAndPurpose(user.getEmail(), EmailTokenPurpose.PASSWORD_RESET_SESSION);
+            return new PasswordResetResponse(true, "Password reset successfully");
+        } catch (Exception ex) {
+            log.error("Failed to reset password", ex);
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return new PasswordResetResponse(false, "Unable to reset password");
+        }
     }
     public UserResponse getCurrentUser(Authentication authentication) {
         String email = authentication != null ? authentication.getName() : null;
@@ -426,6 +503,13 @@ public class AuthService {
                 .expiresAt(Instant.now().plus(10, ChronoUnit.MINUTES))
                 .build());
         mailService.sendRegistrationOtp(user, otp);
+    }
+
+    private void notifyAdminForPendingApproval(AppUser user) {
+        String title = "New " + user.getRole().name().replace('_', ' ').toLowerCase() + " awaiting approval";
+        String message = user.getFirstName() + " " + user.getLastName() + " (" + user.getEmail() + ") has verified email and is waiting for admin approval.";
+        Notification notification = notificationRepository.save(buildNotification(null, Role.ADMIN, title, message, "APPROVAL"));
+        publishNotification(notification.getRecipientEmail(), notification.getRecipientRole(), notification.getTitle(), notification.getMessage(), notification.getCategory());
     }
 
     private String generateOtp() {

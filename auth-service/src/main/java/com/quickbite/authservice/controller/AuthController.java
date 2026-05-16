@@ -4,6 +4,7 @@ import com.quickbite.authservice.dto.*;
 import com.quickbite.authservice.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -11,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping({"/api/auth", "/auth"})
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
@@ -43,13 +44,36 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        return ResponseEntity.ok(authService.forgotPassword(request));
+    public ResponseEntity<PasswordResetResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        PasswordResetResponse response = authService.forgotPassword(request);
+        HttpStatus status = response.success()
+                ? HttpStatus.OK
+                : "User not found".equalsIgnoreCase(response.message())
+                ? HttpStatus.NOT_FOUND
+                : HttpStatus.INTERNAL_SERVER_ERROR;
+        return ResponseEntity.status(status).body(response);
+    }
+
+    @PostMapping({"/verify-otp", "/verify-reset-otp"})
+    public ResponseEntity<PasswordResetResponse> verifyResetOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        PasswordResetResponse response = authService.verifyPasswordResetOtp(request);
+        HttpStatus status = response.success()
+                ? HttpStatus.OK
+                : "User not found".equalsIgnoreCase(response.message())
+                ? HttpStatus.NOT_FOUND
+                : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status).body(response);
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
-        return ResponseEntity.ok(authService.resetPassword(request));
+    public ResponseEntity<PasswordResetResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        PasswordResetResponse response = authService.resetPassword(request);
+        HttpStatus status = response.success()
+                ? HttpStatus.OK
+                : "User not found".equalsIgnoreCase(response.message())
+                ? HttpStatus.NOT_FOUND
+                : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status).body(response);
     }
 
     @GetMapping("/me")
