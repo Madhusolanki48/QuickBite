@@ -36,6 +36,11 @@ public class AppUser {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ApprovalStatus approvalStatus;
+    @Enumerated(EnumType.STRING)
+    @Column(length = 25)
+    private OnboardingStatus onboardingStatus;
+    @Column(length = 500)
+    private String rejectionReason;
     @Column(nullable = false)
     private boolean emailVerified;
     @Column(nullable = false)
@@ -47,7 +52,16 @@ public class AppUser {
     void onCreate() {
         if (createdAt == null)
             createdAt = Instant.now();
-        if (approvalStatus == null)
-            approvalStatus = ApprovalStatus.APPROVED;
+        if (role == Role.CUSTOMER || role == Role.ADMIN) {
+            if (approvalStatus == null)
+                approvalStatus = ApprovalStatus.APPROVED;
+            if (onboardingStatus == null)
+                onboardingStatus = OnboardingStatus.COMPLETED;
+        } else {
+            if (approvalStatus == null)
+                approvalStatus = ApprovalStatus.PENDING;
+            if (onboardingStatus == null)
+                onboardingStatus = OnboardingStatus.NOT_STARTED;
+        }
     }
 }

@@ -40,9 +40,32 @@ public class Restaurant {
     private double rating;
     @Column(nullable = false)
     private Instant createdAt;
+
+    @Column(length = 500)
+    private String description;
+    private Integer minOrder;
+    @Column(length = 20)
+    private String gstin;
+    @Column(length = 20)
+    private String fssai;
+
+    /** All menu items belonging to this restaurant (flat list, preserved from original design). */
     @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<MenuItem> menuItems = new ArrayList<>();
+
+    /**
+     * Menu categories owned by this restaurant.
+     * Each category is scoped to this restaurant — owners manage their own category hierarchy.
+     */
+    @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderBy("displayOrder ASC")
+    @Builder.Default
+    private List<MenuCategory> menuCategories = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<OperatingHour> operatingHours = new ArrayList<>();
 
     @PrePersist
     void onCreate() {
