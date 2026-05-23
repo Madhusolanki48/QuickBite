@@ -13,5 +13,9 @@ public record RestaurantUpdateRequest(
                 Double rating,
                 Long ownerId,
                 String ownerEmail,
-                String ownerName) {
+                String ownerName,
+                String description,
+                Integer minOrder,
+                String gstin,
+                String fssai) {
 }
