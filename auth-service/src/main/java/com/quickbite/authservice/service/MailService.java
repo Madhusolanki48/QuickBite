@@ -26,6 +26,9 @@ public class MailService {
     @Value("${spring.mail.password:}")
     private String password;
 
+    @Value("${app.mail.log-otp:false}")
+    private boolean logOtp;
+
     @PostConstruct
     void logMailConfiguration() {
         if (isBlank(username) || isBlank(password)) {
@@ -35,6 +38,14 @@ public class MailService {
 
     @Async
     public void sendRegistrationOtp(AppUser user, String otp) {
+        if (logOtp) {
+            log.info("QuickBite registration OTP for {}: {}", user.getEmail(), otp);
+        } else {
+            log.info("Sending QuickBite registration OTP email to {}", user.getEmail());
+        }
+        if (isBlank(username) || isBlank(password)) {
+            return;
+        }
         try {
             SimpleMailMessage message = baseMessage(user.getEmail(), "Verify your QuickBite account");
             message.setText("""
@@ -53,6 +64,10 @@ public class MailService {
 
     @Async
     public void sendWelcomeEmail(AppUser user) {
+        if (isBlank(username) || isBlank(password)) {
+            log.info("Gmail SMTP is not configured. Welcome email skipped for {}", user.getEmail());
+            return;
+        }
         try {
             SimpleMailMessage message = baseMessage(user.getEmail(), "Welcome to QuickBite");
             String body = user.getRole() == Role.RESTAURANT_OWNER
@@ -74,6 +89,12 @@ public class MailService {
 
     @Async
     public void sendPasswordResetOtp(AppUser user, String otp) {
+        if (isBlank(username) || isBlank(password)) {
+            if (logOtp) {
+                log.info("Gmail SMTP is not configured. Password reset OTP for {} is: {}", user.getEmail(), otp);
+            }
+            return;
+        }
         try {
             SimpleMailMessage message = baseMessage(user.getEmail(), "QuickBite password reset code");
             message.setText("""

@@ -6,7 +6,9 @@ import com.quickbite.cartservice.dto.CartSummaryResponse;
 import com.quickbite.cartservice.model.CartItem;
 import com.quickbite.cartservice.repository.CartItemRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -23,6 +25,17 @@ public class CartService {
     }
 
     public CartItemResponse add(CartItemRequest request) {
+        List<CartItem> existingCart = cartItemRepository.findByCustomerIdOrderByCreatedAtDesc(request.customerId());
+        if (!existingCart.isEmpty()) {
+            Long currentRestaurantId = existingCart.get(0).getRestaurantId();
+            if (!currentRestaurantId.equals(request.restaurantId())) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Your cart contains items from another restaurant. Please clear your cart to start a new order."
+                );
+            }
+        }
+
         CartItem item = cartItemRepository.findByCustomerIdAndRestaurantIdAndMenuItemId(request.customerId(), request.restaurantId(), request.menuItemId())
                 .map(existing -> {
                     existing.setQuantity(existing.getQuantity() + request.quantity());

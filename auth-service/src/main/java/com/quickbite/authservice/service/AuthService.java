@@ -4,6 +4,7 @@ import com.quickbite.authservice.dto.*;
 import com.quickbite.authservice.exception.*;
 import com.quickbite.authservice.model.AppUser;
 import com.quickbite.authservice.model.ApprovalStatus;
+import com.quickbite.authservice.model.OnboardingStatus;
 import com.quickbite.authservice.model.EmailToken;
 import com.quickbite.authservice.model.EmailTokenPurpose;
 import com.quickbite.authservice.model.Notification;
@@ -55,25 +56,23 @@ public class AuthService {
                 sendAndStoreRegistrationOtp(existing);
                 return new AuthResponse(null, null, 0, toResponse(existing));
             }
-            throw new ResourceAlreadyExistsException("Email is already registered");
+            throw new ResourceAlreadyExistsException("This email is already registered. Please log in instead.");
         }
         if (userRepository.existsByPhoneNumber(request.phoneNumber())) throw new ResourceAlreadyExistsException("Phone number is already registered");
         Role role = request.role() == null ? Role.CUSTOMER : request.role();
         if (role == Role.ADMIN) {
             throw new IllegalArgumentException("Admin accounts cannot be registered from the form");
         }
-        if (role == Role.RESTAURANT_OWNER && (request.restaurantId() == null || request.restaurantId().isBlank())) {
-            throw new IllegalArgumentException("Restaurant selection is required for owner accounts");
-        }
         AppUser user = AppUser.builder()
                 .firstName(request.firstName())
                 .lastName(request.lastName())
                 .email(email)
                 .phoneNumber(request.phoneNumber())
-                .restaurantId(request.restaurantId() != null ? request.restaurantId().trim() : null)
+                .restaurantId(null)
                 .password(passwordEncoder.encode(request.password()))
                 .role(role)
-                .approvalStatus(role == Role.RESTAURANT_OWNER ? ApprovalStatus.PENDING : ApprovalStatus.APPROVED)
+                .approvalStatus(role == Role.CUSTOMER ? ApprovalStatus.APPROVED : ApprovalStatus.PENDING)
+                .onboardingStatus(role == Role.CUSTOMER ? OnboardingStatus.COMPLETED : OnboardingStatus.NOT_STARTED)
                 .emailVerified(false)
                 .enabled(false)
                 .build();
@@ -96,18 +95,24 @@ public class AuthService {
         token.setUsedAt(Instant.now());
         emailTokenRepository.save(token);
         user.setEmailVerified(true);
-        if (user.getRole() != Role.RESTAURANT_OWNER) {
-            user.setEnabled(true);
+        user.setEnabled(true);
+        if (user.getRole() == Role.CUSTOMER) {
+            user.setApprovalStatus(ApprovalStatus.APPROVED);
+            user.setOnboardingStatus(OnboardingStatus.COMPLETED);
+        } else {
+            if (user.getOnboardingStatus() == null) {
+                user.setOnboardingStatus(OnboardingStatus.NOT_STARTED);
+            }
+            if (user.getApprovalStatus() == null) {
+                user.setApprovalStatus(ApprovalStatus.PENDING);
+            }
         }
         AppUser saved = userRepository.save(user);
         mailService.sendWelcomeEmail(saved);
         if (saved.getRole() == Role.RESTAURANT_OWNER || saved.getRole() == Role.DELIVERY_PARTNER) {
             notifyAdminForPendingApproval(saved);
         }
-        if (saved.isEnabled()) {
-            return new AuthResponse(jwtService.generateToken(saved), "Bearer", jwtService.getExpirationMs(), toResponse(saved));
-        }
-        return new AuthResponse(null, null, 0, toResponse(saved));
+        return new AuthResponse(jwtService.generateToken(saved), "Bearer", jwtService.getExpirationMs(), toResponse(saved));
     }
 
     @Transactional
@@ -119,7 +124,7 @@ public class AuthService {
             return new MessageResponse("This account is already verified.");
         }
         sendAndStoreRegistrationOtp(user);
-        return new MessageResponse("A new verification code has been sent to your email.");
+        return new MessageResponse("Verification code sent to " + user.getEmail());
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -127,9 +132,6 @@ public class AuthService {
         AppUser user = userRepository.findByEmailIgnoreCase(email).orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
         if (!user.isEmailVerified()) {
             throw new InvalidCredentialsException("Please verify your email address first");
-        }
-        if (!user.isEnabled()) {
-            throw new InvalidCredentialsException("Account is pending admin approval");
         }
         authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, request.password()));
         return new AuthResponse(jwtService.generateToken(user), "Bearer", jwtService.getExpirationMs(), toResponse(user));
@@ -196,8 +198,7 @@ public class AuthService {
                     .expiresAt(Instant.now().plus(10, ChronoUnit.MINUTES))
                     .build());
             mailService.sendPasswordResetOtp(user, otp);
-            log.info("OTP sent");
-            return new PasswordResetResponse(true, "OTP sent successfully");
+            return new PasswordResetResponse(true, "Password reset code sent to your registered email");
         } catch (Exception ex) {
             log.error("Failed to process forgot password request", ex);
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
@@ -352,6 +353,51 @@ public class AuthService {
         return toAdminResponse(saved);
     }
 
+    @Transactional
+    public UserResponse submitCurrentUserOnboarding(Authentication authentication, SubmitOnboardingRequest request) {
+        AppUser user = authenticatedUser(authentication);
+        if (user.getRole() == Role.RESTAURANT_OWNER) {
+            if (request != null && request.restaurantId() != null && !request.restaurantId().isBlank()) {
+                user.setRestaurantId(request.restaurantId().trim());
+            }
+            if (request != null && request.restaurantName() != null && !request.restaurantName().isBlank()) {
+                user.setRestaurantName(request.restaurantName().trim());
+            }
+        }
+        user.setOnboardingStatus(OnboardingStatus.SUBMITTED);
+        user.setApprovalStatus(ApprovalStatus.PENDING);
+        user.setRejectionReason(null);
+        AppUser saved = userRepository.save(user);
+        notifyAdminForPendingApproval(saved);
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public AdminUserResponse updateUserApproval(Authentication authentication, Long userId, UpdateApprovalRequest request) {
+        requireAdmin(authentication);
+        AppUser user = userRepository.findById(userId).orElseThrow(() -> new InvalidCredentialsException("User not found"));
+        if (user.getRole() == Role.ADMIN) {
+            throw new AccessDeniedException("Admin accounts cannot be modified");
+        }
+        user.setApprovalStatus(request.approvalStatus());
+        if (request.approvalStatus() == ApprovalStatus.APPROVED) {
+            user.setEnabled(true);
+            user.setOnboardingStatus(OnboardingStatus.COMPLETED);
+            user.setRejectionReason(null);
+        } else if (request.approvalStatus() == ApprovalStatus.REJECTED) {
+            user.setEnabled(false);
+            user.setRejectionReason(request.rejectionReason() != null ? request.rejectionReason().trim() : "Application requirements not met.");
+        }
+        AppUser saved = userRepository.save(user);
+        String title = saved.getApprovalStatus() == ApprovalStatus.APPROVED ? "Application approved" : "Application rejected";
+        String message = saved.getApprovalStatus() == ApprovalStatus.APPROVED
+                ? "Your " + saved.getRole() + " application has been approved! You can now access your dashboard."
+                : "Your " + saved.getRole() + " application was not approved: " + saved.getRejectionReason();
+        notificationRepository.save(buildNotification(saved.getEmail(), null, title, message, "APPROVAL"));
+        publishNotification(saved.getEmail(), null, title, message, "APPROVAL");
+        return toAdminResponse(saved);
+    }
+
     @Transactional(readOnly = true)
     public List<NotificationResponse> listNotifications(Authentication authentication) {
         AppUser user = authenticatedUser(authentication);
@@ -417,6 +463,8 @@ public class AuthService {
                 user.getRestaurantId(),
                 user.getRestaurantName(),
                 user.getApprovalStatus(),
+                user.getOnboardingStatus(),
+                user.getRejectionReason(),
                 user.isEnabled(),
                 user.getCreatedAt()
         );
@@ -473,7 +521,9 @@ public class AuthService {
                 user.getRole(),
                 user.getRestaurantId(),
                 user.getRestaurantName(),
-                user.getApprovalStatus()
+                user.getApprovalStatus(),
+                user.getOnboardingStatus(),
+                user.getRejectionReason()
         );
     }
 
@@ -493,7 +543,7 @@ public class AuthService {
         return Character.toUpperCase(base.charAt(0)) + base.substring(1);
     }
 
-    private void sendAndStoreRegistrationOtp(AppUser user) {
+    private String sendAndStoreRegistrationOtp(AppUser user) {
         emailTokenRepository.deleteByEmailIgnoreCaseAndPurposeAndUsedAtIsNull(user.getEmail(), EmailTokenPurpose.REGISTRATION_OTP);
         String otp = generateOtp();
         emailTokenRepository.save(EmailToken.builder()
@@ -503,6 +553,7 @@ public class AuthService {
                 .expiresAt(Instant.now().plus(10, ChronoUnit.MINUTES))
                 .build());
         mailService.sendRegistrationOtp(user, otp);
+        return otp;
     }
 
     private void notifyAdminForPendingApproval(AppUser user) {

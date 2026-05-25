@@ -10,15 +10,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class DeliveryAgentProfileService {
+    private static final Set<String> ALLOWED_AGENT_EMAILS = Set.of(
+            "agent1@quickbite.com",
+            "agent2@quickbite.com",
+            "agent3@quickbite.com",
+            "agent4@quickbite.com"
+    );
+
     private final DeliveryAgentProfileRepository repository;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<DeliveryAgentProfileResponse> findAll() {
-        return repository.findAll().stream().map(this::toResponse).toList();
+        repository.deleteByEmailNotIn(ALLOWED_AGENT_EMAILS);
+        return repository.findAll().stream()
+                .filter(profile -> ALLOWED_AGENT_EMAILS.contains(profile.getEmail().toLowerCase()))
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
