@@ -23,7 +23,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return false;
+        String path = request.getServletPath();
+        return path.startsWith("/v3/api-docs") ||
+                path.startsWith("/swagger-ui") ||
+                path.equals("/swagger-ui.html");
     }
 
     @Override
@@ -35,7 +38,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String token = header.substring(7);
                 String email = jwtService.extractUsername(token);
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    User user = new User(email, "", List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER")));
+                    String role = jwtService.extractRole(token);
+                    String authority = "ROLE_" + role;
+                    User user = new User(email, "", List.of(new SimpleGrantedAuthority(authority)));
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(user,
                             null, user.getAuthorities());
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
