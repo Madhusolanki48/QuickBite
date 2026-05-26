@@ -113,6 +113,12 @@ public class AuthController {
         return ResponseEntity.ok(authService.listUsers(authentication));
     }
 
+    @PutMapping("/me/onboarding")
+    public ResponseEntity<UserResponse> submitOnboarding(Authentication authentication,
+            @RequestBody(required = false) SubmitOnboardingRequest request) {
+        return ResponseEntity.ok(authService.submitCurrentUserOnboarding(authentication, request));
+    }
+
     @PatchMapping("/admin/users/{id}/role")
     public ResponseEntity<AdminUserResponse> changeRole(Authentication authentication, @PathVariable Long id,
             @Valid @RequestBody UpdateRoleRequest request) {
@@ -123,5 +129,11 @@ public class AuthController {
     public ResponseEntity<AdminUserResponse> changeEnabled(Authentication authentication, @PathVariable Long id,
             @Valid @RequestBody UpdateEnabledRequest request) {
         return ResponseEntity.ok(authService.updateUserEnabled(authentication, id, request));
+    }
+
+    @PatchMapping("/admin/users/{id}/approval")
+    public ResponseEntity<AdminUserResponse> changeApproval(Authentication authentication, @PathVariable Long id,
+            @Valid @RequestBody UpdateApprovalRequest request) {
+        return ResponseEntity.ok(authService.updateUserApproval(authentication, id, request));
     }
 }

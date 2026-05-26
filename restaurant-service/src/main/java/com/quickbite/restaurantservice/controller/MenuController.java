@@ -6,6 +6,7 @@ import com.quickbite.restaurantservice.service.RestaurantService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,7 +28,10 @@ public class MenuController {
     }
 
     @PostMapping("/restaurants/{restaurantId}")
-    public ResponseEntity<?> add(@PathVariable Long restaurantId, @Valid @RequestBody MenuItemRequest request) {
-        return ResponseEntity.ok(restaurantService.addMenuItem(restaurantId, request));
+    public ResponseEntity<?> add(
+            @PathVariable Long restaurantId,
+            @Valid @RequestBody MenuItemRequest request,
+            Authentication auth) {
+        return ResponseEntity.ok(restaurantService.addMenuItem(restaurantId, request, auth));
     }
 }

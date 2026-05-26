@@ -6,17 +6,32 @@ import com.quickbite.orderservice.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping({"/api/orders", "/orders"})
 @RequiredArgsConstructor
 public class OrderController {
     private final OrderService orderService;
 
+    /**
+     * GET /api/orders                    → all orders (admin)
+     * GET /api/orders?restaurantId=1     → orders for specific restaurant (owner dashboard)
+     * GET /api/orders?customerEmail=x@y  → orders for specific customer (my orders)
+     */
     @GetMapping
-    public ResponseEntity<List<OrderResponse>> all() {
+    public ResponseEntity<List<OrderResponse>> all(
+            @RequestParam(required = false) Long restaurantId,
+            @RequestParam(required = false) String customerEmail) {
+        if (restaurantId != null && restaurantId > 0) {
+            return ResponseEntity.ok(orderService.findByRestaurantId(restaurantId));
+        }
+        if (customerEmail != null && !customerEmail.isBlank()) {
+            return ResponseEntity.ok(orderService.findByCustomerEmail(customerEmail.trim()));
+        }
         return ResponseEntity.ok(orderService.findAll());
     }
 
@@ -25,19 +40,25 @@ public class OrderController {
         return ResponseEntity.ok(orderService.findById(id));
     }
 
-    @GetMapping("/internal/{id}")
-    public ResponseEntity<OrderResponse> internalOne(@PathVariable Long id) {
-        return ResponseEntity.ok(orderService.findById(id));
-    }
-
     @PostMapping
     public ResponseEntity<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
         return ResponseEntity.ok(orderService.create(request));
     }
 
+    @PutMapping("/{id}/assign-delivery")
+    public ResponseEntity<OrderResponse> assignDelivery(
+            @PathVariable Long id,
+            @Valid @RequestBody AssignDeliveryRequest request,
+            Authentication auth) {
+        return ResponseEntity.ok(orderService.assignDelivery(id, request, auth));
+    }
+
     @PatchMapping("/{id}/status")
-    public ResponseEntity<OrderResponse> status(@PathVariable Long id, @RequestParam OrderStatus status) {
-        return ResponseEntity.ok(orderService.updateStatus(id, status));
+    public ResponseEntity<OrderResponse> status(
+            @PathVariable Long id,
+            @RequestParam OrderStatus status,
+            Authentication auth) {
+        return ResponseEntity.ok(orderService.updateStatus(id, status, auth));
     }
 
     @PatchMapping("/{id}/payment-status")
