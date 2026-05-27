@@ -76,6 +76,9 @@ services:
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
       JWT_SECRET: ${JWT_SECRET:-}
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
+      RESTAURANT_SERVICE_URL: http://restaurant-service:8082
+      SERVICES_RESTAURANT_SERVICE_URL: http://restaurant-service:8082
+      SERVICES_DELIVERY_SERVICE_URL: http://delivery-service:8085
     depends_on:
       - eureka-server
 

@@ -4,7 +4,7 @@ spring:
   application:
     name: restaurant-service
   cache:
-    type: redis
+    type: ${CACHE_TYPE:simple}
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -29,3 +29,7 @@ eureka:
     fetch-registry: true
   instance:
     prefer-ip-address: true
+
+quickbite:
+  internal:
+    service-key: ${INTERNAL_SERVICE_KEY:quickbite-internal-secret-token}

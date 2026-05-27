@@ -1,4 +1,4 @@
-package com.quickbite.restaurantservice.config;
+package com.quickbite.orderservice.config;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -16,9 +16,9 @@ public class OpenApiConfig {
     public OpenAPI quickbiteOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("QuickBite Restaurant Service API")
+                        .title("QuickBite Order Service API")
                         .version("v1")
-                        .description("APIs for restaurant, menu, and owner operations in QuickBite"))
+                        .description("Order creation, tracking, status, and delivery assignment APIs for QuickBite."))
                 .addSecurityItem(new SecurityRequirement().addList(BEARER_AUTH))
                 .components(new Components().addSecuritySchemes(BEARER_AUTH,
                         new SecurityScheme()

@@ -79,6 +79,16 @@ spring:
           predicates:
             - Path=/api/cart/**
 
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:lb://order-service}
+          predicates:
+            - Path=/api/orders/**
+
+        - id: order-service-alias
+          uri: ${ORDER_SERVICE_URL:lb://order-service}
+          predicates:
+            - Path=/orders/**
+
 eureka:
   client:
     service-url:

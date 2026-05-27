@@ -1,7 +1,5 @@
-FROM maven:3.9.9-eclipse-temurin-21
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY src src
-COPY pom.xml ./
-RUN mvn -q -DskipTests package
+COPY target/order-service-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8083
-CMD ["java", "-jar", "target/order-service-0.0.1-SNAPSHOT.jar"]
+CMD ["java", "-jar", "app.jar"]
