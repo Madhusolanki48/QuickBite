@@ -3,6 +3,7 @@ package com.quickbite.authservice.dto;
 import com.quickbite.authservice.model.Role;
 import com.quickbite.authservice.model.ApprovalStatus;
 import com.quickbite.authservice.model.OnboardingStatus;
+import java.time.Instant;
 
 public record UserResponse(
                 Long id,
@@ -15,5 +16,6 @@ public record UserResponse(
                 String restaurantName,
                 ApprovalStatus approvalStatus,
                 OnboardingStatus onboardingStatus,
-                String rejectionReason) {
+                String rejectionReason,
+                Instant createdAt) {
 }

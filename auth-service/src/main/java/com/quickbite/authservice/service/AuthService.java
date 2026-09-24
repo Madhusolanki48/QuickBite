@@ -588,7 +588,8 @@ public class AuthService {
                 user.getRestaurantName(),
                 user.getApprovalStatus(),
                 user.getOnboardingStatus(),
-                user.getRejectionReason()
+                user.getRejectionReason(),
+                user.getCreatedAt()
         );
     }
 
