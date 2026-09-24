@@ -87,6 +87,11 @@ public class AuthController {
         return ResponseEntity.ok(authService.updateCurrentUser(authentication, request));
     }
 
+    @DeleteMapping("/me")
+    public ResponseEntity<MessageResponse> deleteMe(Authentication authentication) {
+        return ResponseEntity.ok(authService.deleteCurrentUser(authentication));
+    }
+
     @GetMapping("/validate")
     public ResponseEntity<ValidationResponse> validate(Authentication authentication) {
         return ResponseEntity.ok(authService.validate(authentication));

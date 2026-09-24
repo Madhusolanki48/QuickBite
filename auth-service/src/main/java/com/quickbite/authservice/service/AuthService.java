@@ -17,6 +17,11 @@ import com.quickbite.authservice.messaging.NotificationEvent;
 import com.quickbite.authservice.messaging.NotificationEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -25,17 +30,24 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
+import org.springframework.web.client.RestTemplate;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.security.SecureRandom;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AuthService {
+    @Value("${ORDER_SERVICE_URL:http://order-service:8083}")
+    private String orderServiceUrl;
+
     private final UserRepository userRepository;
     private final EmailTokenRepository emailTokenRepository;
     private final NotificationRepository notificationRepository;
@@ -300,6 +312,59 @@ public class AuthService {
             user.setPassword(passwordEncoder.encode(request.password()));
         }
         return toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public MessageResponse deleteCurrentUser(Authentication authentication) {
+        AppUser user = authenticatedUser(authentication);
+        if (user.getRole() == Role.ADMIN) {
+            throw new AccessDeniedException("Admin account cannot be deleted.");
+        }
+
+        // Keep in mind: a person can't delete an account when he placed some order;
+        // he can only delete when no current/active order is in account.
+        checkNoActiveOrders(user.getEmail());
+
+        emailTokenRepository.deleteByEmailIgnoreCase(user.getEmail());
+        notificationRepository.deleteByRecipientEmailIgnoreCase(user.getEmail());
+        userRepository.delete(user);
+
+        log.info("Deleted account successfully for email: {}", user.getEmail());
+        return new MessageResponse("Account deleted successfully");
+    }
+
+    private void checkNoActiveOrders(String email) {
+        if (email == null || email.isBlank()) {
+            return;
+        }
+        try {
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout(3000);
+            factory.setReadTimeout(3000);
+            RestTemplate restTemplate = new RestTemplate(factory);
+
+            String url = orderServiceUrl + "/api/orders?customerEmail=" + URLEncoder.encode(email.trim(), StandardCharsets.UTF_8);
+            ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<>() {}
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                for (Map<String, Object> order : response.getBody()) {
+                    Object statusObj = order.get("orderStatus");
+                    String status = statusObj != null ? statusObj.toString() : "";
+                    if (!status.isBlank() && !"DELIVERED".equalsIgnoreCase(status) && !"CANCELLED".equalsIgnoreCase(status)) {
+                        throw new IllegalArgumentException("Cannot delete account while you have active orders in progress (Current order status: " + status + "). Please wait until your orders are delivered or cancelled.");
+                    }
+                }
+            }
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.warn("Could not query order-service for active orders check: {}", ex.getMessage());
+        }
     }
 
     @Transactional(readOnly = true)
