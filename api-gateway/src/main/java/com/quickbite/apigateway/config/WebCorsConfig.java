@@ -19,7 +19,10 @@ public class WebCorsConfig {
                 "http://localhost:3000",
                 "http://127.0.0.1:4200",
                 "http://127.0.0.1:5173",
-                "http://127.0.0.1:3000"));
+                "http://127.0.0.1:3000",
+                "https://*.vercel.app",
+                "*"
+                ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization", "Location"));
