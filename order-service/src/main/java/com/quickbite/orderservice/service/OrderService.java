@@ -269,7 +269,7 @@ public class OrderService {
 
         if (isOwner) {
             assertRestaurantOwnerOrAdmin(order.getRestaurantId(), auth);
-            if (newStatus == OrderStatus.CONFIRMED || newStatus == OrderStatus.PREPARING || newStatus == OrderStatus.READY) {
+            if (newStatus == OrderStatus.CONFIRMED || newStatus == OrderStatus.PREPARING || newStatus == OrderStatus.READY || newStatus == OrderStatus.OUT_FOR_DELIVERY) {
                 return;
             }
             throw new IllegalArgumentException("Restaurant owner cannot transition order directly to " + newStatus);
