@@ -26,7 +26,7 @@ public class MailService {
     @Value("${spring.mail.password:}")
     private String password;
 
-    @Value("${app.mail.log-otp:false}")
+    @Value("${app.mail.log-otp:true}")
     private boolean logOtp;
 
     @PostConstruct
