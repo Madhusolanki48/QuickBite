@@ -157,12 +157,12 @@ services:
       - "8080:8080"
     environment:
       AUTH_SERVICE_URL: http://auth-service:8081
-      RESTAURANT_SERVICE_URL: lb://restaurant-service
-      ORDER_SERVICE_URL: lb://order-service
-      PAYMENT_SERVICE_URL: lb://payment-service
-      REVIEW_SERVICE_URL: lb://review-service
-      CART_SERVICE_URL: lb://cart-service
-      DELIVERY_SERVICE_URL: lb://delivery-service
+      RESTAURANT_SERVICE_URL: http://restaurant-service:8082
+      ORDER_SERVICE_URL: http://order-service:8083
+      PAYMENT_SERVICE_URL: http://payment-service:8084
+      REVIEW_SERVICE_URL: http://review-service:8086
+      CART_SERVICE_URL: http://cart-service:8088
+      DELIVERY_SERVICE_URL: http://delivery-service:8085
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka/
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}

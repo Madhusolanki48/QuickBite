@@ -32,6 +32,9 @@ public class SecurityConfig {
                                 "/delivery-agents/internal/**",
                                 "/api/deliveries/internal/**",
                                 "/deliveries/internal/**").hasAuthority(InternalAuthFilter.ROLE_INTERNAL_SERVICE)
+                        .requestMatchers(HttpMethod.GET, "/api/deliveries/**", "/deliveries/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/deliveries/**", "/deliveries/**").permitAll()
+                        .requestMatchers(HttpMethod.PATCH, "/api/deliveries/**", "/deliveries/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())

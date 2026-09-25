@@ -31,7 +31,11 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/orders/internal/**",
                                 "/orders/internal/**").hasAuthority(InternalAuthFilter.ROLE_INTERNAL_SERVICE)
-                        .requestMatchers("/api/orders/ws/**", "/orders/ws/**").permitAll()
+                        .requestMatchers("/api/orders/ws/**", "/orders/ws/**", "/api/orders/ws-sockjs/**", "/orders/ws-sockjs/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/orders/**", "/orders/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/orders/**", "/orders/**").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/orders/**", "/orders/**").permitAll()
+                        .requestMatchers(HttpMethod.PATCH, "/api/orders/**", "/orders/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
