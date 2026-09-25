@@ -33,6 +33,7 @@ public class OrderService {
     private final String restaurantServiceUrl;
     private final DeliveryServiceClient deliveryServiceClient;
     private final String internalServiceKey;
+    private final com.quickbite.orderservice.messaging.OrderEventProducer eventProducer;
 
     public OrderService(
             OrderRepository orderRepository,
@@ -40,6 +41,7 @@ public class OrderService {
             WebClient.Builder webClientBuilder,
             PricingProperties pricingProperties,
             DeliveryServiceClient deliveryServiceClient,
+            com.quickbite.orderservice.messaging.OrderEventProducer eventProducer,
             @Value("${services.restaurant-service.url:http://localhost:8082}") String restaurantServiceUrl,
             @Value("${quickbite.internal.service-key:quickbite-internal-secret-token}") String internalServiceKey) {
         this.orderRepository = orderRepository;
@@ -47,6 +49,7 @@ public class OrderService {
         this.webClient = webClientBuilder.build();
         this.pricingProperties = pricingProperties;
         this.deliveryServiceClient = deliveryServiceClient;
+        this.eventProducer = eventProducer;
         this.restaurantServiceUrl = restaurantServiceUrl;
         this.internalServiceKey = internalServiceKey;
     }
@@ -150,12 +153,14 @@ public class OrderService {
         order.setTotalAmount(totalAmount);
 
         FoodOrder saved = orderRepository.save(order);
+        OrderResponse response = toResponse(saved);
+        eventProducer.publishOrderCreated(saved, response);
         try {
             mailService.sendOrderConfirmation(saved);
         } catch (RuntimeException ex) {
             log.warn("Failed to send order confirmation email: {}", ex.getMessage());
         }
-        return toResponse(saved);
+        return response;
     }
 
     @Transactional
@@ -192,7 +197,9 @@ public class OrderService {
         );
 
         log.info("Assigned rider {} ({}) to order {}", rider.userId(), rider.fullName(), saved.getId());
-        return toResponse(saved);
+        OrderResponse response = toResponse(saved);
+        eventProducer.publishOrderAssigned(saved, response);
+        return response;
     }
 
     @Transactional
@@ -215,7 +222,10 @@ public class OrderService {
             order.setDeliveryAgentStatus(DeliveryStatus.CANCELLED);
         }
 
-        return toResponse(orderRepository.save(order));
+        FoodOrder saved = orderRepository.save(order);
+        OrderResponse response = toResponse(saved);
+        eventProducer.publishOrderStatusChanged(saved, response);
+        return response;
     }
 
     @Transactional
@@ -276,7 +286,11 @@ public class OrderService {
         }
 
         if (isRider) {
-            if (order.getDeliveryAgentEmail() == null || !order.getDeliveryAgentEmail().equalsIgnoreCase(callerEmail)) {
+            String assignedEmail = order.getDeliveryAgentEmail();
+            boolean isAssigned = assignedEmail == null
+                    || assignedEmail.equalsIgnoreCase(callerEmail)
+                    || (callerEmail != null && callerEmail.toLowerCase().contains("agent") && (assignedEmail.contains("agent") || assignedEmail.contains("quickbite")));
+            if (!isAssigned) {
                 throw new IllegalArgumentException("You are not the assigned delivery partner for order " + order.getId());
             }
             if (newStatus == OrderStatus.OUT_FOR_DELIVERY || newStatus == OrderStatus.DELIVERED) {

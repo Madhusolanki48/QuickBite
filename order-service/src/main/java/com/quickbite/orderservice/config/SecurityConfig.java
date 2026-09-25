@@ -31,6 +31,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/orders/internal/**",
                                 "/orders/internal/**").hasAuthority(InternalAuthFilter.ROLE_INTERNAL_SERVICE)
+                        .requestMatchers("/api/orders/ws/**", "/orders/ws/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

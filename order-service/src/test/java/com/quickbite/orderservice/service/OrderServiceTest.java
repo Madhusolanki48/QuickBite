@@ -60,6 +60,9 @@ class OrderServiceTest {
     @Mock
     private DeliveryServiceClient deliveryServiceClient;
 
+    @Mock
+    private com.quickbite.orderservice.messaging.OrderEventProducer eventProducer;
+
     private OrderService orderService;
     private PricingProperties pricingProperties;
 
@@ -73,6 +76,7 @@ class OrderServiceTest {
                 webClientBuilder,
                 pricingProperties,
                 deliveryServiceClient,
+                eventProducer,
                 "http://restaurant-service",
                 "quickbite-internal-secret-token"
         );

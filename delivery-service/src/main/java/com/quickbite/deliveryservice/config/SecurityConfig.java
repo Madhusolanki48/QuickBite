@@ -1,5 +1,6 @@
 package com.quickbite.deliveryservice.config;
 
+import com.quickbite.deliveryservice.security.InternalAuthFilter;
 import com.quickbite.deliveryservice.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.*;
 import org.springframework.http.HttpMethod;
@@ -19,11 +20,22 @@ import java.util.List;
 @Configuration
 public class SecurityConfig {
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter filter) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtAuthenticationFilter filter,
+            InternalAuthFilter internalAuthFilter) throws Exception {
         http.cors(Customizer.withDefaults()).csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/error").permitAll()
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll().anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/api/delivery-agents/internal/**",
+                                "/delivery-agents/internal/**",
+                                "/api/deliveries/internal/**",
+                                "/deliveries/internal/**").hasAuthority(InternalAuthFilter.ROLE_INTERNAL_SERVICE)
+                        .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .anyRequest().authenticated())
+                .addFilterBefore(internalAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

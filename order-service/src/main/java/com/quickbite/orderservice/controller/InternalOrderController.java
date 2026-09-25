@@ -20,6 +20,7 @@ public class InternalOrderController {
 
     private final OrderService orderService;
     private final OrderRepository orderRepository;
+    private final com.quickbite.orderservice.messaging.OrderEventProducer eventProducer;
 
     @GetMapping("/{id}")
     public ResponseEntity<OrderResponse> getOrderInternal(@PathVariable Long id) {
@@ -41,7 +42,9 @@ public class InternalOrderController {
         if (deliveryStatus != null) {
             order.setDeliveryAgentStatus(deliveryStatus);
         }
-        orderRepository.save(order);
-        return ResponseEntity.ok(orderService.findById(id));
+        FoodOrder saved = orderRepository.save(order);
+        OrderResponse response = orderService.findById(id);
+        eventProducer.publishOrderStatusChanged(saved, response);
+        return ResponseEntity.ok(response);
     }
 }
