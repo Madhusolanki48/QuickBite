@@ -24,9 +24,13 @@ public class InternalDeliveryController {
 
     private static final Map<Long, InternalRiderDto> SEED_RIDERS = Map.of(
             1L, new InternalRiderDto(1L, "Jackson Ron", "agent1@quickbite.com", "+91 98765 00001", true, true),
+            165L, new InternalRiderDto(165L, "Jackson Ron", "agent1@quickbite.com", "+91 98765 00001", true, true),
             2L, new InternalRiderDto(2L, "Paul Weasely", "agent2@quickbite.com", "+91 98765 00002", true, true),
+            166L, new InternalRiderDto(166L, "Paul Weasely", "agent2@quickbite.com", "+91 98765 00002", true, true),
             3L, new InternalRiderDto(3L, "Olive Mandy", "agent3@quickbite.com", "+91 98765 00003", true, true),
-            4L, new InternalRiderDto(4L, "Edward Ford", "agent4@quickbite.com", "+91 98765 00004", true, true)
+            167L, new InternalRiderDto(167L, "Olive Mandy", "agent3@quickbite.com", "+91 98765 00003", true, true),
+            4L, new InternalRiderDto(4L, "Edward Ford", "agent4@quickbite.com", "+91 98765 00004", true, true),
+            168L, new InternalRiderDto(168L, "Edward Ford", "agent4@quickbite.com", "+91 98765 00004", true, true)
     );
 
     @GetMapping({"/delivery-agents/internal/{userId}", "/api/delivery-agents/internal/{userId}"})
@@ -46,12 +50,11 @@ public class InternalDeliveryController {
                     if (fallback != null) {
                         return ResponseEntity.ok(fallback);
                     }
-                    // Generic fallback for any other ID
                     return ResponseEntity.ok(new InternalRiderDto(
                             userId,
-                            "Jackson Ron",
-                            "agent1@quickbite.com",
-                            "+91 98765 00001",
+                            "Paul Weasely",
+                            "agent2@quickbite.com",
+                            "+91 98765 00002",
                             true,
                             true
                     ));
@@ -66,12 +69,22 @@ public class InternalDeliveryController {
                 .orElseGet(() -> DeliveryAssignment.builder().orderId(request.orderId()).build());
 
         assignment.setRiderId(request.riderId());
-        assignment.setRiderName(request.riderName() != null ? request.riderName() : "Jackson Ron");
+        assignment.setRiderName(request.riderName() != null ? request.riderName() : "Assigned Partner");
         assignment.setRiderPhone(request.riderPhone() != null ? request.riderPhone() : "+91 98765 00001");
         assignment.setDeliveryAddress(request.deliveryAddress() != null ? request.deliveryAddress() : "Address on file");
         assignment.setDeliveryStatus(DeliveryStatus.ASSIGNED);
 
         deliveryRepository.save(assignment);
         return ResponseEntity.ok(Map.of("status", "SUCCESS", "orderId", request.orderId()));
+    }
+
+    @PatchMapping({"/deliveries/internal/{orderId}/cancel", "/api/deliveries/internal/{orderId}/cancel"})
+    public ResponseEntity<Map<String, Object>> cancelDeliveryInternal(@PathVariable Long orderId) {
+        log.info("Internal cancelling delivery assignment for orderId: {}", orderId);
+        deliveryRepository.findByOrderId(orderId).ifPresent(assignment -> {
+            assignment.setDeliveryStatus(DeliveryStatus.CANCELLED);
+            deliveryRepository.save(assignment);
+        });
+        return ResponseEntity.ok(Map.of("status", "CANCELLED", "orderId", orderId));
     }
 }

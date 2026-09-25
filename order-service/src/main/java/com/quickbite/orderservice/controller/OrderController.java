@@ -57,8 +57,9 @@ public class OrderController {
     public ResponseEntity<OrderResponse> status(
             @PathVariable Long id,
             @RequestParam OrderStatus status,
+            @RequestParam(required = false) String reason,
             Authentication auth) {
-        return ResponseEntity.ok(orderService.updateStatus(id, status, auth));
+        return ResponseEntity.ok(orderService.updateStatus(id, status, auth, reason));
     }
 
     @PatchMapping("/{id}/payment-status")

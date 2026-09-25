@@ -204,6 +204,11 @@ public class OrderService {
 
     @Transactional
     public OrderResponse updateStatus(Long id, OrderStatus newStatus, Authentication auth) {
+        return updateStatus(id, newStatus, auth, null);
+    }
+
+    @Transactional
+    public OrderResponse updateStatus(Long id, OrderStatus newStatus, Authentication auth, String reason) {
         FoodOrder order = orderRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Order not found with id: " + id));
 
@@ -220,6 +225,12 @@ public class OrderService {
             order.setDeliveryAgentStatus(DeliveryStatus.DELIVERED);
         } else if (newStatus == OrderStatus.CANCELLED) {
             order.setDeliveryAgentStatus(DeliveryStatus.CANCELLED);
+            if (reason != null && !reason.isBlank()) {
+                order.setNote("Cancelled: " + reason.trim());
+            } else if (order.getNote() == null || !order.getNote().startsWith("Cancelled")) {
+                order.setNote("Cancelled: Kitchen capacity / Ingredients unavailable");
+            }
+            deliveryServiceClient.cancelAssignment(id);
         }
 
         FoodOrder saved = orderRepository.save(order);

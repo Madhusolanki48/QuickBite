@@ -66,16 +66,16 @@ public class DeliveryServiceClient {
     }
 
     private InternalRiderDto fallbackRider(Long riderId) {
-        if (riderId != null && riderId == 2L) {
-            return new InternalRiderDto(2L, "Paul Weasely", "agent2@quickbite.com", "+91 98765 00002", true, true);
+        if (riderId != null && (riderId == 2L || riderId == 166L)) {
+            return new InternalRiderDto(riderId, "Paul Weasely", "agent2@quickbite.com", "+91 98765 00002", true, true);
         }
-        if (riderId != null && riderId == 3L) {
-            return new InternalRiderDto(3L, "Olive Mandy", "agent3@quickbite.com", "+91 98765 00003", true, true);
+        if (riderId != null && (riderId == 3L || riderId == 167L)) {
+            return new InternalRiderDto(riderId, "Olive Mandy", "agent3@quickbite.com", "+91 98765 00003", true, true);
         }
-        if (riderId != null && riderId == 4L) {
-            return new InternalRiderDto(4L, "Edward Ford", "agent4@quickbite.com", "+91 98765 00004", true, true);
+        if (riderId != null && (riderId == 4L || riderId == 168L)) {
+            return new InternalRiderDto(riderId, "Edward Ford", "agent4@quickbite.com", "+91 98765 00004", true, true);
         }
-        return new InternalRiderDto(1L, "Jackson Ron", "agent1@quickbite.com", "+91 98765 00001", true, true);
+        return new InternalRiderDto(riderId != null ? riderId : 1L, "Jackson Ron", "agent1@quickbite.com", "+91 98765 00001", true, true);
     }
 
     public void recordAssignment(Long orderId, Long riderId, String riderName, String riderPhone, String deliveryAddress) {
@@ -97,6 +97,20 @@ public class DeliveryServiceClient {
             log.info("Successfully notified delivery-service of assignment for orderId: {}", orderId);
         } catch (Exception ex) {
             log.warn("Could not record delivery assignment with delivery-service: {}", ex.getMessage());
+        }
+    }
+
+    public void cancelAssignment(Long orderId) {
+        try {
+            webClient.patch()
+                    .uri(deliveryServiceUrl + "/api/deliveries/internal/{orderId}/cancel", orderId)
+                    .header("X-Internal-Service-Key", internalServiceKey)
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block(Duration.ofSeconds(5));
+            log.info("Successfully notified delivery-service of cancellation for orderId: {}", orderId);
+        } catch (Exception ex) {
+            log.warn("Could not notify delivery-service of cancellation: {}", ex.getMessage());
         }
     }
 }
