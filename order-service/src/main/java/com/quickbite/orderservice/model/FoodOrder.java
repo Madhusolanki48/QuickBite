@@ -85,6 +85,7 @@ public class FoodOrder {
     private Instant createdAt;
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "order_id")
     @Builder.Default
     private List<FoodOrderItem> items = new ArrayList<>();
 

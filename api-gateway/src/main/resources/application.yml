@@ -30,6 +30,8 @@ spring:
             exposedHeaders:
               - Authorization
               - Location
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
       routes:
         - id: auth-service
           uri: ${AUTH_SERVICE_URL:lb://auth-service}
@@ -80,6 +82,11 @@ spring:
           uri: ${CART_SERVICE_URL:lb://cart-service}
           predicates:
             - Path=/api/cart/**
+
+        - id: order-service-ws
+          uri: ${ORDER_SERVICE_WS_URL:ws://order-service:8083}
+          predicates:
+            - Path=/api/orders/ws, /api/orders/ws/**, /orders/ws, /orders/ws/**
 
         - id: order-service
           uri: ${ORDER_SERVICE_URL:lb://order-service}

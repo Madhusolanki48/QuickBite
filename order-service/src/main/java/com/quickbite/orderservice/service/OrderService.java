@@ -116,13 +116,13 @@ public class OrderService {
 
         for (OrderItemRequest itemReq : request.items()) {
             ValidatedItemDto validated = validationSucceeded ? validatedMap.get(itemReq.menuItemId()) : null;
-            double price = (validated != null) ? validated.effectivePrice()
-                    : (itemReq.unitPrice() != null && itemReq.unitPrice() > 0 ? itemReq.unitPrice() : 0.0);
-            String name = (validated != null) ? validated.name()
-                    : (itemReq.itemName() != null ? itemReq.itemName() : "Item");
-            if (validated != null && (!validated.available() || !validated.active())) {
-                throw new IllegalArgumentException("Menu item '" + validated.name() + "' is currently unavailable");
-            }
+            String name = (itemReq.itemName() != null && !itemReq.itemName().isBlank())
+                    ? itemReq.itemName().trim()
+                    : (validated != null ? validated.name() : "Item");
+            double price = (itemReq.unitPrice() != null && itemReq.unitPrice() > 0)
+                    ? itemReq.unitPrice()
+                    : (validated != null ? validated.effectivePrice() : 0.0);
+
             FoodOrderItem item = FoodOrderItem.builder()
                     .menuItemId(itemReq.menuItemId() != null && itemReq.menuItemId() > 0 ? itemReq.menuItemId() : null)
                     .itemName(name)
@@ -134,8 +134,8 @@ public class OrderService {
 
         double subtotal = round(order.getItems().stream().mapToDouble(i -> i.getUnitPrice() * i.getQuantity()).sum());
 
-        double discount = 0.0;
-        if (request.promoCode() != null && request.promoCode().trim().equalsIgnoreCase("FOOD10")) {
+        double discount = request.discountAmount() != null && request.discountAmount() > 0 ? request.discountAmount() : 0.0;
+        if (discount == 0.0 && request.promoCode() != null && request.promoCode().trim().equalsIgnoreCase("FOOD10")) {
             if (subtotal >= 100.0) {
                 discount = 50.0;
             }
